@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>FoodHub Admin</title>
+<style>
+body{font-family:Arial;background:#fffaf6;margin:0;color:#32170f}.w{max-width:1100px;margin:30px auto;padding:0 20px}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:13px}
+th{background:#e94b16;color:#fff}input,select,button{padding:9px;border-radius:6px;border:1px solid #ddd}
+button{background:#e94b16;color:#fff;border:none;cursor:pointer}.c{display:inline-block;background:#fff;padding:14px 22px;margin:0 12px 18px 0;border-radius:10px;border:1px solid #eee}
+</style></head><body><div class="w" id="app"></div>
+<script src="localdb.js"></script>
+<script>
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const app = document.getElementById('app');
+
+function login(msg = '') {
+  app.style.maxWidth = '340px';
+  app.innerHTML = `<h2>FoodHub Admin</h2><p><input id="e" placeholder="Email" style="width:100%"></p>
+    <p><input id="p" type="password" placeholder="Password" style="width:100%"></p>
+    <button id="go">Login</button> <span style="color:red">${msg}</span>
+    <p><small>Default: admin@foodhub.com / Admin@123</small></p>`;
+  document.getElementById('go').onclick = async () => {
+    (await DB.adminLogin(e.value, p.value)) ? dash() : login('Invalid credentials');
+  };
+}
+function dash() {
+  if (!DB.isAdmin()) return login();
+  app.style.maxWidth = '1100px';
+  const orders = DB.allOrders();
+  const rev = orders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0);
+  app.innerHTML = `<h2>FoodHub Admin Dashboard <small><a href="#" id="lo">Logout</a> | <a href="index.html">View site</a></small></h2>
+    <div class="c">Orders<br><b>${orders.length}</b></div><div class="c">Revenue<br><b>₹${rev}</b></div>
+    <table><tr><th>ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr>
+    ${orders.map(o => `<tr><td>${esc(o.order_code)}</td>
+      <td>${esc(o.customer_name)}<br><small>${esc(o.phone)}<br>${esc(o.address + ', ' + o.city)}</small></td>
+      <td>${esc(o.items.map(i => i.name + ' x' + i.qty).join(', '))}</td><td>₹${o.total}</td><td>${esc(o.payment.toUpperCase())}</td>
+      <td><select onchange="DB.setStatus(${o.id}, this.value); dash()">
+        ${DB.STATUSES.map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td></tr>`).join('')}
+    </table><p><button onclick="if(confirm('Delete ALL users and orders?')){DB.resetAll();dash()}">Reset all data</button></p>`;
+  document.getElementById('lo').onclick = e => { e.preventDefault(); DB.adminLogout(); login(); };
+}
+window.addEventListener('storage', () => DB.isAdmin() && dash());   // new orders appear live
+DB.isAdmin() ? dash() : login();
+</script></body></html>
